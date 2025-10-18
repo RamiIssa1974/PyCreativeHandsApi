@@ -1,0 +1,67 @@
+# =========================================
+# Python & FastAPI Git Ignore for Windows
+# =========================================
+
+# Virtual environments
+.venv/
+env/
+venv/
+
+# Byte-compiled / cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Logs
+*.log
+logs/
+*.out
+
+# Database / Environment
+.env
+*.db
+*.sqlite3
+
+# IDEs & Editors
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# OS files
+Thumbs.db
+.DS_Store
+
+# Testing / Coverage
+.coverage
+.tox/
+.nox/
+.pytest_cache/
+
+# Build / Distribution
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# Uvicorn / Run artifacts
+*.pid
+*.sock
+
+# Local scripts or test data
+sandbox/
+temp/
+*.bak
+*.old
+
+# Optional: exclude large data or deployment artifacts
+*.zip
+*.tar.gz
+*.rar
+
+# =========================================
+# END
+# =========================================
