@@ -1,7 +1,7 @@
 from sqlalchemy import Column, Integer, String, Numeric
 from app.db.base import Base
 
-class ProductVariation(Base):
+class SqlProductVariation(Base):
     __tablename__ = "ProductVariation"  # CHANGE if needed
     Id = Column(Integer, primary_key=True, index=True)
     ProductId = Column(Integer, nullable=False)

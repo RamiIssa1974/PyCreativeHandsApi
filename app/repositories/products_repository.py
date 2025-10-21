@@ -4,13 +4,13 @@ from sqlalchemy.orm import Session
 from contextlib import contextmanager
 
 from app.db.session_sql import get_db
-from app.models_sql.product import Product
-from app.models_sql.category import Category
-from app.models_sql.product_category import ProductCategory
-from app.models_sql.image import Image
-from app.models_sql.product_variation import ProductVariation
-from app.models_sql.product_available_colours import ProductAvailableColours
-from app.models_sql.order_item import OrderItem
+from app.models_sql.product import SqlProduct
+from app.models_sql.category import SqlCategory
+from app.models_sql.product_category import SqlProductCategory
+from app.models_sql.image import SqlImage
+from app.models_sql.product_variation import SqlProductVariation
+from app.models_sql.product_available_colours import SqlProductAvailableColours
+from app.models_sql.orders import SqlOrderItem
 
 from app.schemas.product import (
     GetProductRequest,
@@ -99,21 +99,21 @@ class ProductsRepository:
     def get_products(self, req: GetProductRequest) -> List[ProductModel]:
         with _session() as db:
             # Base select
-            stmt = select(Product)
+            stmt = select(SqlProduct)
 
             # Collect WHERE conditions (ANDed)
             conditions = []
 
             # Filter by Id (exact)
             if req.Id is not None and int(req.Id) > 0:
-                conditions.append(Product.Id == int(req.Id))
+                conditions.append(  SqlProduct.Id == int(req.Id))
 
             # Filter by Name (contains, case-insensitive)
             if req.Name:
                 name = req.Name.strip()
                 if name:
                     conditions.append(
-                        func.lower(Product.Name).like(f"%{name.lower()}%")
+                        func.lower(SqlProduct.Name).like(f"%{name.lower()}%")
                     )
 
             # Filter by Description (contains)
@@ -121,18 +121,18 @@ class ProductsRepository:
                 desc = req.Description.strip()
                 if desc:
                     # Only add if column exists on your table
-                    if hasattr(Product, "Description"):
+                    if hasattr(SqlProduct, "Description"):
                         conditions.append(
-                            func.lower(Product.Description).like(f"%{desc.lower()}%")
+                            func.lower(SqlProduct.Description).like(f"%{desc.lower()}%")
                         )
 
             # Filter by Barcode (contains) — only if your Product table has a Barcode column
             if req.Barcode:
                 bc = req.Barcode.strip()
-                if bc and hasattr(Product, "Barcode"):
+                if bc and hasattr(SqlProduct, "Barcode"):
                     conditions.append(
-                        func.lower(getattr(Product, "Barcode")).like(f"%{bc.lower()}%")
-                        )
+                        func.lower(getattr(SqlProduct, "Barcode")).like(f"%{bc.lower()}%")
+                    )
 
             # Filter by CategoryId/SubCategoryId via ProductCategory relation
             # If SubCategoryId provided > 0, we prioritize it; else CategoryId
@@ -146,8 +146,8 @@ class ProductsRepository:
                 conditions.append(
                     exists().where(
                         and_(
-                            ProductCategory.ProductId == Product.Id,
-                            ProductCategory.CategoryId == cat_id,
+                            SqlProductCategory.ProductId == SqlProduct.Id,
+                            SqlProductCategory.CategoryId == cat_id,
                         )
                     )
                 )
@@ -163,7 +163,7 @@ class ProductsRepository:
             if limit <= 0: limit = 5000
             if limit > 5000: limit = 5000
 
-            stmt = stmt.order_by(Product.Id).offset(skip).limit(limit)
+            stmt = stmt.order_by(SqlProduct.Id).offset(skip).limit(limit)
 
             rows = db.execute(stmt).scalars().all()
             return [ProductModel.model_validate(r, from_attributes=True) for r in rows]
@@ -171,7 +171,7 @@ class ProductsRepository:
         category_ids = [int(c) for c in (category_ids or []) if int(c) > 0]
         # Load existing
         existing = db.execute(
-            select(ProductCategory).where(ProductCategory.ProductId == product_id)
+            select(SqlProductCategory).where(SqlProductCategory.ProductId == product_id)
         ).scalars().all()
         existing_set = {(pc.ProductId, pc.CategoryId) for pc in existing}
         desired_set = {(product_id, cid) for cid in category_ids}
@@ -180,20 +180,20 @@ class ProductsRepository:
         to_del = existing_set - desired_set
 
         if to_add:
-            db.add_all([ProductCategory(ProductId=pid, CategoryId=cid) for (pid, cid) in to_add])
+            db.add_all([SqlProductCategory(ProductId=pid, CategoryId=cid) for (pid, cid) in to_add])
 
         if to_del:
             db.execute(
-                delete(ProductCategory).where(
-                    (ProductCategory.ProductId == product_id) &
-                    (ProductCategory.CategoryId.in_([cid for (_, cid) in to_del]))
+                delete(SqlProductCategory).where(
+                    (SqlProductCategory.ProductId == product_id) &
+                    (SqlProductCategory.CategoryId.in_([cid for (_, cid) in to_del]))
                 )
             )
 
     def _update_product_available_colours(self, db: Session, product_id: int, codes: list[str]) -> None:
         codes = [c.strip() for c in (codes or []) if c and c.strip()]
         existing = db.execute(
-            select(ProductAvailableColours).where(ProductAvailableColours.ProductId == product_id)
+            select(SqlProductAvailableColours).where(SqlProductAvailableColours.ProductId == product_id)
         ).scalars().all()
         existing_codes = {e.Code for e in existing}
         desired_codes = set(codes)
@@ -202,13 +202,13 @@ class ProductsRepository:
         to_del = existing_codes - desired_codes
 
         if to_add:
-            db.add_all([ProductAvailableColours(ProductId=product_id, Code=code) for code in to_add])
+            db.add_all([SqlProductAvailableColours(ProductId=product_id, Code=code) for code in to_add])
 
         if to_del:
             db.execute(
-                delete(ProductAvailableColours).where(
-                    (ProductAvailableColours.ProductId == product_id) &
-                    (ProductAvailableColours.Code.in_(list(to_del)))
+                delete(SqlProductAvailableColours).where(
+                    (SqlProductAvailableColours.ProductId == product_id) &
+                    (SqlProductAvailableColours.Code.in_(list(to_del)))
                 )
             )
 
@@ -223,7 +223,7 @@ class ProductsRepository:
 
         # Load existing for this product
         existing = db.execute(
-            select(ProductVariation).where(ProductVariation.ProductId == product_id)
+            select(SqlProductVariation).where(SqlProductVariation.ProductId == product_id)
         ).scalars().all()
         existing_ids = {ev.Id for ev in existing}
 
@@ -237,7 +237,7 @@ class ProductsRepository:
 
         # Inserts
         for v in incoming_new:
-            db.add(ProductVariation(
+            db.add(SqlProductVariation(
                 ProductId=product_id,
                 Price=v.Price,
                 Description=(v.Description or None)
@@ -248,9 +248,9 @@ class ProductsRepository:
         to_delete = existing_ids - incoming_ids
         if to_delete:
             db.execute(
-                delete(ProductVariation).where(
-                    (ProductVariation.ProductId == product_id) &
-                    (ProductVariation.Id.in_(list(to_delete)))
+                delete(SqlProductVariation).where(
+                    (SqlProductVariation.ProductId == product_id) &
+                    (SqlProductVariation.Id.in_(list(to_delete)))
                 )
             )
 
@@ -265,9 +265,9 @@ class ProductsRepository:
         # Correct behavior is: delete rows where ProductId == productId AND Id NOT IN keep_ids
         if keep_ids:
             db.execute(
-                delete(Image).where(
-                    (Image.ProductId == product_id) &
-                    (~Image.Id.in_(list(keep_ids)))
+                delete(SqlImage).where(
+                    (SqlImage.ProductId == product_id) &
+                    (~SqlImage.Id.in_(list(keep_ids)))
                 )
             )
         else:
@@ -283,7 +283,7 @@ class ProductsRepository:
                 pid = int(req.Id) if req.Id else 0
 
                 if pid > 0:
-                    obj = db.get(Product, pid)
+                    obj = db.get(SqlProduct, pid)
                     if not obj:
                         return 0
                     # update fields
@@ -296,7 +296,7 @@ class ProductsRepository:
                     db.flush()
                     product_id = obj.Id
                 else:
-                    obj = Product(
+                    obj = SqlProduct(
                         Name=req.Name,
                         Price=req.Price,
                         SalePrice=req.SalePrice,
@@ -323,25 +323,25 @@ class ProductsRepository:
     def delete_product(self, product_id: int) -> bool:
          with _session() as db:
             # Exists?
-            p = db.get(Product, product_id)
+            p = db.get(SqlProduct, product_id)
             if not p:
                 return False
 
             # Referenced by orders? -> block with 409 at router
             refs = db.execute(
                 select(func.count())
-                .select_from(OrderItem)
-                .where(OrderItem.ProductId == product_id)
+                .select_from(SqlOrderItem)
+                .where(SqlOrderItem.ProductId == product_id)
             ).scalar_one()
             if refs and int(refs) > 0:
                 return "referenced"
 
             # Delete children first (respect FKs), then parent; single commit
             try:
-                db.execute(delete(Image).where(Image.ProductId == product_id))
-                db.execute(delete(ProductVariation).where(ProductVariation.ProductId == product_id))
-                db.execute(delete(ProductAvailableColours).where(ProductAvailableColours.ProductId == product_id))
-                db.execute(delete(ProductCategory).where(ProductCategory.ProductId == product_id))
+                db.execute(delete(SqlImage).where(SqlImage.ProductId == product_id))
+                db.execute(delete(SqlProductVariation).where(SqlProductVariation.ProductId == product_id))
+                db.execute(delete(SqlProductAvailableColours).where(SqlProductAvailableColours.ProductId == product_id))
+                db.execute(delete(SqlProductCategory).where(SqlProductCategory.ProductId == product_id))
 
                 db.delete(p)
                 db.commit()
@@ -354,8 +354,8 @@ class ProductsRepository:
     def get_product_categories(self) -> List[ProductCategoryModel]:
         with _session() as db:
         # tolerate Id vs id on the SQLAlchemy model
-            order_col = _order_col(ProductCategory, "Id", "id")
-            stmt = select(ProductCategory)
+            order_col = _order_col(SqlProductCategory, "Id", "id")
+            stmt = select(SqlProductCategory)
             if order_col is not None:
                 stmt = stmt.order_by(order_col)
 
@@ -377,20 +377,20 @@ class ProductsRepository:
     # --- Categories ---
     def get_categories(self) -> List[CategoryModel]:
         with _session() as db:
-            rows = db.execute(select(Category).order_by(Category.Id)).scalars().all()
+            rows = db.execute(select(SqlCategory).order_by(SqlCategory.Id)).scalars().all()
             return [CategoryModel.model_validate(r, from_attributes=True) for r in rows]
 
     # --- Images ---
     def get_images(self) -> List[ProductImageModel]:
         with _session() as db:
-            rows = db.execute(select(Image).order_by(Image.Id)).scalars().all()
+            rows = db.execute(select(SqlImage).order_by(SqlImage.Id)).scalars().all()
             return [ProductImageModel.model_validate(r, from_attributes=True) for r in rows]
 
     # --- Product Variations ---
     def get_product_variations(self) -> List[ProductVariationModel]:
         with _session() as db:
             rows = db.execute(
-                select(ProductVariation).order_by(ProductVariation.Id)
+                select(SqlProductVariation).order_by(SqlProductVariation.Id)
             ).scalars().all()
             return [
                 ProductVariationModel.model_validate(r, from_attributes=True)
@@ -401,7 +401,7 @@ class ProductsRepository:
     def get_available_colours(self) -> List[ProductAvailableColoursModel]:
         with _session() as db:
             rows = db.execute(
-                select(ProductAvailableColours).order_by(ProductAvailableColours.Id)
+                select(SqlProductAvailableColours).order_by(SqlProductAvailableColours.Id)
             ).scalars().all()
             return [
                 ProductAvailableColoursModel.model_validate(r, from_attributes=True)

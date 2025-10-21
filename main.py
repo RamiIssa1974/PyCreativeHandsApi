@@ -1,9 +1,15 @@
+from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import get_settings
 from app.db.session_sql import ping_db
 from app.routers import products
+from app.routers import orders,auth
+from app.routers import purchase as purchase_router
+from app.routers import upload as upload_router
+from app.routers import video as video_router
 
+load_dotenv()
 settings = get_settings()
 show_docs = settings.ENV.lower() != "prod"  
 ALLOWED_ORIGINS = [
@@ -33,6 +39,24 @@ app.add_middleware(
 )
 
 app.include_router(products.router)
+app.include_router(orders.router, prefix="/api")
+app.include_router(orders.router)
+app.include_router(auth.router, prefix="/api")
+app.include_router(auth.router)
+app.include_router(purchase_router.router, prefix="/api/purchases", tags=["Purchase"])
+app.include_router(purchase_router.router, prefix="/api/Purchases", tags=["Purchase"])
+app.include_router(purchase_router.router, prefix="/purchases", tags=["Purchase"])
+app.include_router(purchase_router.router, prefix="/Purchases", tags=["Purchase"])
+app.include_router(upload_router.router, tags=["Upload"])
+app.include_router(video_router.router, prefix="/api/video", tags=["Video"])
+app.include_router(video_router.router, prefix="/api/Video", tags=["Video"])
+app.include_router(video_router.router, prefix="/video", tags=["Video"])
+app.include_router(video_router.router, prefix="/Video", tags=["Video"])
+
+
+
+
+
 
 @app.get("/health")
 def health_check():

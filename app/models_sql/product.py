@@ -1,7 +1,7 @@
 from sqlalchemy import Column, Integer, String, Numeric
 from app.db.base import Base
 
-class Product(Base):
+class SqlProduct(Base):
     __tablename__ = "Product"  # change to your real table if different
     Id = Column(Integer, primary_key=True, index=True)
     Name = Column(String(200), nullable=False)
